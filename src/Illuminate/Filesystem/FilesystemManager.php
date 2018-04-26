@@ -7,6 +7,7 @@ use Aws\S3\S3Client;
 use OpenCloud\Rackspace;
 use Illuminate\Support\Arr;
 use InvalidArgumentException;
+use Illuminate\Support\Manager;
 use League\Flysystem\AdapterInterface;
 use League\Flysystem\Sftp\SftpAdapter;
 use League\Flysystem\FilesystemInterface;
@@ -22,14 +23,8 @@ use Illuminate\Contracts\Filesystem\Factory as FactoryContract;
 /**
  * @mixin \Illuminate\Contracts\Filesystem\Filesystem
  */
-class FilesystemManager implements FactoryContract
+class FilesystemManager extends Manager implements FactoryContract
 {
-    /**
-     * The application instance.
-     *
-     * @var \Illuminate\Contracts\Foundation\Application
-     */
-    protected $app;
 
     /**
      * The array of resolved filesystem drivers.
@@ -37,24 +32,6 @@ class FilesystemManager implements FactoryContract
      * @var array
      */
     protected $disks = [];
-
-    /**
-     * The registered custom driver creators.
-     *
-     * @var array
-     */
-    protected $customCreators = [];
-
-    /**
-     * Create a new filesystem manager instance.
-     *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
-     * @return void
-     */
-    public function __construct($app)
-    {
-        $this->app = $app;
-    }
 
     /**
      * Get a filesystem instance.
@@ -114,9 +91,15 @@ class FilesystemManager implements FactoryContract
     protected function resolve($name)
     {
         $config = $this->getConfig($name);
+        //var_dump($config); die();
 
         if (isset($this->customCreators[$config['driver']])) {
-            return $this->callCustomCreator($config);
+            $driver= $this->callCustomCreator($config);
+            if ($driver instanceof FilesystemInterface) {
+                return $this->adapt($driver);
+             }
+             return $driver;
+
         }
 
         $driverMethod = 'create'.ucfirst($config['driver']).'Driver';
@@ -126,23 +109,6 @@ class FilesystemManager implements FactoryContract
         } else {
             throw new InvalidArgumentException("Driver [{$config['driver']}] is not supported.");
         }
-    }
-
-    /**
-     * Call a custom driver creator.
-     *
-     * @param  array  $config
-     * @return \Illuminate\Contracts\Filesystem\Filesystem
-     */
-    protected function callCustomCreator(array $config)
-    {
-        $driver = $this->customCreators[$config['driver']]($this->app, $config);
-
-        if ($driver instanceof FilesystemInterface) {
-            return $this->adapt($driver);
-        }
-
-        return $driver;
     }
 
     /**
@@ -354,20 +320,6 @@ class FilesystemManager implements FactoryContract
     public function getDefaultCloudDriver()
     {
         return $this->app['config']['filesystems.cloud'];
-    }
-
-    /**
-     * Register a custom driver creator Closure.
-     *
-     * @param  string    $driver
-     * @param  \Closure  $callback
-     * @return $this
-     */
-    public function extend($driver, Closure $callback)
-    {
-        $this->customCreators[$driver] = $callback;
-
-        return $this;
     }
 
     /**

@@ -100,12 +100,18 @@ abstract class Manager
     /**
      * Call a custom driver creator.
      *
-     * @param  string  $driver
+     * @param  mixed $driver
      * @return mixed
      */
     protected function callCustomCreator($driver)
     {
-        return $this->customCreators[$driver]($this->app);
+        if(is_array($driver)){
+            return $this->customCreators[$driver['driver']]($this->app, $driver);
+         }else{
+            return $this->customCreators[$driver]($this->app);
+         }
+
+
     }
 
     /**
